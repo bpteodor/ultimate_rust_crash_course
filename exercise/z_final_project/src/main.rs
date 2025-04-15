@@ -1,3 +1,8 @@
+#![allow(dead_code, unused_imports, unused_variables)]
+
+use clap::{arg, command, value_parser, Arg, ArgAction, Command};
+use std::path::PathBuf;
+
 // FINAL PROJECT
 //
 // Create an image processing application.  Exactly what it does and how it does
@@ -32,54 +37,105 @@ fn main() {
     //
     // Challenge: If you're feeling really ambitious, you could delete this code
     // and use the "clap" library instead: https://docs.rs/clap/2.32.0/clap/
-    let mut args: Vec<String> = std::env::args().skip(1).collect();
-    if args.is_empty() {
-        print_usage_and_exit();
+    let matches = command!() // requires `cargo` feature
+        .subcommand_required(true)
+        .arg_required_else_help(true)
+        //.arg(arg!([name] "Optional name to operate on"))
+        .args([
+            arg!(input: -i --"input-file" <FILE> "image file to process").action(ArgAction::Set),
+            arg!(output: -o --"output-file" <FILE> "output file").action(ArgAction::Set),
+        ])
+        .subcommand(Command::new("blur").about("apply blur to image"))
+        .subcommand(
+            Command::new("brighten")
+                .about("apply blur to image")
+                .arg(arg!(value: "value to use for increasing brightness").action(ArgAction::Set)),
+        )
+        .get_matches();
+
+    let in_file = matches.get_one::<String>("input").expect("no input file");
+    let out_file = matches.get_one::<String>("output").expect("no output file");
+
+    match matches.subcommand() {
+        Some(("blur", _arg_match)) => {
+            blur(in_file, out_file);
+        }
+        Some(("brighten", arg_match)) => {
+            let val = arg_match
+                .get_one::<String>("value")
+                .expect("no brightnes")
+                .parse::<i32>()
+                .expect("invalid brightnes");
+            brighten(in_file, out_file, val);
+        }
+        _ => unreachable!("Unsupported command specified"),
     }
-    let subcommand = args.remove(0);
-    match subcommand.as_str() {
-        // EXAMPLE FOR CONVERSION OPERATIONS
-        "blur" => {
-            if args.len() != 2 {
-                print_usage_and_exit();
-            }
-            let infile = args.remove(0);
-            let outfile = args.remove(0);
-            // **OPTION**
-            // Improve the blur implementation -- see the blur() function below
-            blur(infile, outfile);
-        }
+    println!("done");
+    if true {
+        return;
+    }
 
-        // **OPTION**
-        // Brighten -- see the brighten() function below
+    // ---- whitout library variant ---------------
 
-        // **OPTION**
-        // Crop -- see the crop() function below
-
-        // **OPTION**
-        // Rotate -- see the rotate() function below
-
-        // **OPTION**
-        // Invert -- see the invert() function below
-
-        // **OPTION**
-        // Grayscale -- see the grayscale() function below
-
-        // A VERY DIFFERENT EXAMPLE...a really fun one. :-)
-        "fractal" => {
-            if args.len() != 1 {
-                print_usage_and_exit();
-            }
-            let outfile = args.remove(0);
-            fractal(outfile);
-        }
-
-        // **OPTION**
-        // Generate -- see the generate() function below -- this should be sort of like "fractal()"!
-
-        // For everything else...
-        _ => {
+    {
+        let mut args: Vec<String> = std::env::args().skip(1).collect();
+        if args.is_empty() {
             print_usage_and_exit();
+        }
+        let subcommand = args.remove(0);
+        match subcommand.as_str() {
+            // EXAMPLE FOR CONVERSION OPERATIONS
+            "blur" => {
+                if args.len() != 2 {
+                    print_usage_and_exit();
+                }
+                let infile = args.remove(0);
+                let outfile = args.remove(0);
+                // **OPTION**
+                // Improve the blur implementation -- see the blur() function below
+                blur(&infile, &outfile);
+            }
+
+            // **OPTION**
+            "brighten" => {
+                if args.len() != 2 {
+                    print_usage_and_exit();
+                }
+                let infile = args.remove(0);
+                let outfile = args.remove(0);
+                // **OPTION**
+                // Improve the blur implementation -- see the blur() function below
+                brighten(&infile, &outfile, 50);
+            }
+
+            // **OPTION**
+            // Crop -- see the crop() function below
+
+            // **OPTION**
+            // Rotate -- see the rotate() function below
+
+            // **OPTION**
+            // Invert -- see the invert() function below
+
+            // **OPTION**
+            // Grayscale -- see the grayscale() function below
+
+            // A VERY DIFFERENT EXAMPLE...a really fun one. :-)
+            "fractal" => {
+                if args.len() != 1 {
+                    print_usage_and_exit();
+                }
+                let outfile = args.remove(0);
+                fractal(outfile);
+            }
+
+            // **OPTION**
+            // Generate -- see the generate() function below -- this should be sort of like "fractal()"!
+
+            // For everything else...
+            _ => {
+                print_usage_and_exit();
+            }
         }
     }
 }
@@ -87,14 +143,15 @@ fn main() {
 fn print_usage_and_exit() {
     println!("USAGE (when in doubt, use a .png extension on your filenames)");
     println!("blur INFILE OUTFILE");
+    println!("brighten INFILE OUTFILE");
     println!("fractal OUTFILE");
     // **OPTION**
     // Print useful information about what subcommands and arguments you can use
-    // println!("...");
+    // println!("Commands: ");
     std::process::exit(-1);
 }
 
-fn blur(infile: String, outfile: String) {
+fn blur(infile: &String, outfile: &String) {
     // Here's how you open an existing image file
     let img = image::open(infile).expect("Failed to open INFILE.");
     // **OPTION**
@@ -105,11 +162,14 @@ fn blur(infile: String, outfile: String) {
     img2.save(outfile).expect("Failed writing OUTFILE.");
 }
 
-fn brighten(infile: String, outfile: String) {
+fn brighten(infile: &String, outfile: &String, val: i32) {
     // See blur() for an example of how to open / save an image.
+    let img = image::open(&infile).expect(format!("Failed to open file {:?}", &infile).as_str());
 
     // .brighten() takes one argument, an i32.  Positive numbers brighten the
     // image. Negative numbers darken it.  It returns a new image.
+    let oimg = img.brighten(val);
+    oimg.save(outfile).expect("Failed writing OUTFILE");
 
     // Challenge: parse the brightness amount from the command-line and pass it
     // through to this function.
